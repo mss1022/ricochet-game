@@ -5,7 +5,7 @@ const PARAMS = {
   // Physics
   bulletSpeed: 480,
   bulletRadius: 6,
-  maxBounces: 10,
+  maxBounces: 15,
 
   // Preview ray
   previewDots: 80,
