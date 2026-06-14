@@ -135,16 +135,19 @@ class Bullet {
       if (this.y + this.r >= WB) { this.dead=true; return; }
       if (this.dead) return;
 
-      // Targets: only interact after first wall bounce
-      if (this._charged) {
-        for (const tgt of targets) {
-          if (tgt.hp <= 0) continue;
-          const hw=PARAMS.targetW/2, hh=PARAMS.targetH/2;
-          const cx=Math.max(tgt.x-hw,Math.min(this.x,tgt.x+hw));
-          const cy=Math.max(tgt.y-hh,Math.min(this.y,tgt.y+hh));
-          let nx=this.x-cx, ny=this.y-cy;
-          const distSq=nx*nx+ny*ny;
-          if (distSq < this.r*this.r) {
+      // Target collision
+      for (const tgt of targets) {
+        if (tgt.hp <= 0) continue;
+        const hw=PARAMS.targetW/2, hh=PARAMS.targetH/2;
+        const cx=Math.max(tgt.x-hw,Math.min(this.x,tgt.x+hw));
+        const cy=Math.max(tgt.y-hh,Math.min(this.y,tgt.y+hh));
+        let nx=this.x-cx, ny=this.y-cy;
+        const distSq=nx*nx+ny*ny;
+        if (distSq < this.r*this.r) {
+          if (!this._charged) {
+            // Direct hit before wall bounce → miss
+            this.dead=true; this.isMiss=true;
+          } else {
             const len=Math.sqrt(distSq)||0.001;
             nx/=len; ny/=len;
             const dot=this.vx*nx+this.vy*ny;
@@ -155,8 +158,8 @@ class Bullet {
               this._totalHits++;
               if (this._totalHits > 40) this.dead=true;
             }
-            break;
           }
+          break;
         }
       }
       if (this.dead) return;
@@ -225,6 +228,7 @@ class Game {
     this._resultType = '';
     this._flashTimer = 0;
     this._flashColor = '';
+    this._missPopup = 0; // countdown timer for "直当てダメ！" text
     this._lastTime = null;
 
     this._bindEvents();
@@ -240,6 +244,7 @@ class Game {
     this._aimDrag = false;
     this._previewSeg = null;
     this._flashTimer = 0;
+    this._missPopup = 0;
   }
 
   _startGame() {
@@ -365,11 +370,23 @@ class Game {
     if (this.state==='result') { this._resultTimer-=dt; for(const t of this.targets) t.update(dt); return; }
     if (this.state!=='playing') return;
     for (const t of this.targets) t.update(dt);
+    if (this._missPopup > 0) this._missPopup -= dt;
     if (this.bullet) {
       this.bullet.update(dt, this.targets);
-      if (this.bullet.dead) { this.bullet=null; this._updatePreview(); }
+      if (this.bullet.dead) {
+        const wasMiss = this.bullet.isMiss;
+        this.bullet=null; this._updatePreview();
+        if (wasMiss) this._triggerMiss();
+      }
     }
     this._checkStageEnd();
+  }
+
+  _triggerMiss() {
+    this._flashTimer = 0.35;
+    this._flashColor = 'rgba(255,30,30,0.45)';
+    this._missPopup = 1.4;
+    window.audioManager && window.audioManager.miss();
   }
 
   _checkStageEnd() {
@@ -410,6 +427,22 @@ class Game {
       ctx.save(); ctx.globalAlpha=this._flashTimer*3;
       ctx.fillStyle=this._flashColor; ctx.fillRect(0,0,CW,CH); ctx.restore();
     }
+
+    // Miss popup
+    if (this._missPopup > 0) {
+      const a = Math.min(1, this._missPopup * 2);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.font = 'bold 28px monospace';
+      ctx.textAlign = 'center';
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillText('直当てダメ！', CW/2+2, CH/2+2);
+      ctx.fillStyle = '#ff4444';
+      ctx.fillText('直当てダメ！', CW/2, CH/2);
+      ctx.restore();
+    }
+
     if (this.state==='result') this._drawResult(ctx);
   }
 

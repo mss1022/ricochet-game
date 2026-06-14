@@ -103,6 +103,20 @@ class AudioManager {
     this._tone(220, t + 0.2, 0.20, 'sawtooth', 0.10);
   }
 
+  // Direct hit miss (buzzer)
+  miss() {
+    this._init(); this._resume();
+    const ac = this._ac, t = ac.currentTime;
+    const osc = ac.createOscillator(), g = ac.createGain();
+    osc.connect(g); g.connect(this._master);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(300, t);
+    osc.frequency.exponentialRampToValueAtTime(100, t + 0.25);
+    g.gain.setValueAtTime(0.22, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    osc.start(t); osc.stop(t + 0.3);
+  }
+
   // All stages cleared
   allClear() {
     this._init(); this._resume();
